@@ -1,0 +1,10 @@
+django>=5.2,<5.3
+djangorestframework
+channels
+daphne
+psycopg[binary]
+dj-database-url
+django-environ
+django-cors-headers
+pytest-django
+ruff

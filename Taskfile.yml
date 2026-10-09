@@ -1,0 +1,96 @@
+version: '3'
+
+dotenv: ['.env']
+
+vars:
+  PY: '{{if eq OS "windows"}}python{{else}}python3{{end}}'
+  VENV_BIN: '{{if eq OS "windows"}}.venv/Scripts{{else}}.venv/bin{{end}}'
+
+tasks:
+  default:
+    cmds: [task --list]
+
+  check:
+    desc: Mostra as versões das ferramentas instaladas
+    ignore_error: true
+    cmds:
+      - '{{.PY}} --version'
+      - node --version
+      - npm --version
+      - git --version
+
+  setup:
+    desc: Instala tudo (backend + frontend)
+    deps: [setup:backend, setup:frontend]
+
+  setup:backend:
+    dir: backend
+    cmds:
+      - '{{.PY}} -m venv .venv'
+      - '{{.VENV_BIN}}/python -m pip install -U pip'
+      - '{{.VENV_BIN}}/pip install -r requirements.txt'
+
+  setup:frontend:
+    dir: frontend
+    cmds: [npm install]
+
+  makemigrations:
+    dir: backend
+    cmds: ['{{.VENV_BIN}}/python manage.py makemigrations']
+
+  migrate:
+    desc: Aplica as migrations no Supabase
+    dir: backend
+    cmds: ['{{.VENV_BIN}}/python manage.py migrate']
+
+  dev:
+    desc: Sobe backend (8000) e frontend (3000) em paralelo
+    deps: [dev:backend, dev:frontend]
+
+  dev:backend:
+    dir: backend
+    cmds: ['{{.VENV_BIN}}/python manage.py runserver 0.0.0.0:8000']
+
+  dev:frontend:
+    dir: frontend
+    cmds: [npm run dev]
+
+  test:
+    deps: [test:backend, test:frontend]
+
+  test:backend:
+    dir: backend
+    cmds: ['{{.VENV_BIN}}/pytest -q']
+
+  test:frontend:
+    dir: frontend
+    cmds: [npm test --if-present]
+
+  lint:
+    cmds:
+      - cd backend && {{.VENV_BIN}}/ruff check .
+      - cd frontend && npm run lint
+
+  cleanup:
+    desc: Remove convidados inativos há mais de 30 dias
+    dir: backend
+    cmds: ['{{.VENV_BIN}}/python manage.py cleanup_guests --days 30']
+
+  build:
+    desc: Build de produção
+    cmds:
+      - cd frontend && npm run build
+      - cd backend && {{.VENV_BIN}}/python manage.py collectstatic --noinput
+      - cd backend && {{.VENV_BIN}}/python manage.py check --deploy
+
+  start:
+    desc: Produção local (Daphne + Next)
+    deps: [start:backend, start:frontend]
+
+  start:backend:
+    dir: backend
+    cmds: ['{{.VENV_BIN}}/daphne -b 0.0.0.0 -p 8000 config.asgi:application']
+
+  start:frontend:
+    dir: frontend
+    cmds: [npm run start]
